@@ -59,7 +59,7 @@ map<string, double> viewpoint;	//viewpoint of user
 //spreaders 
 vector<string> Sh;	
 vector<string> Sb;
-map<int, vector<string> > spreader;
+map<int, queue<int> > spreader;
 
 
 struct MAP {  
@@ -87,7 +87,6 @@ MAP xx;
  
 int father[N];          // father node
 int dfn[N], id[N], tim; 
-
 vector<int> subtree[N+1]; // subtree of each node
 
 //results
@@ -188,8 +187,7 @@ void readGraph(const char* file){
 		viewpoint[*it_vector]=round(randomNumber * 10) / 10;
 		
 	}
-	
-	//map<string, int>::iterator it_for_indeg;	
+		
 	for(it_for_pa=pa.begin(),it_for_pb=pb.begin();it_for_pa!=pa.end();it_for_pa++,it_for_pb++){	
 		viewpoint[it_for_pa->first]=(it_for_pa->second*2)/(it_for_pa->second+it_for_pb->second)-1;
 		viewpoint[it_for_pa->first]=round(viewpoint[it_for_pa->first] * 10) / 10;
@@ -218,7 +216,6 @@ void readGraph(const char* file){
 		x=InputEdges.at(j);
 		y=InputEdges.at(j+1);
 		int i=j/2;
-		//cout<<y<<" "<<i<<endl; 
 		adj_in[y].push_back(pair<int,double>(x,EdgeProb[i])); 
 	} 
 
@@ -226,7 +223,6 @@ void readGraph(const char* file){
 	//userID_Name;
 	for(map<string, int>::iterator it_map=user2ID.begin();it_map!=user2ID.end();it_map++){
 		userID_Name[it_map->second]=it_map->first;
-		//cout<<it_map->second<<" "<<userID_Name[it_map->second]<<" "<<user2ID[userID_Name[it_map->second]]<<endl;
 	}
 	
 	
@@ -236,6 +232,126 @@ void readGraph(const char* file){
 
 }
 
+
+void readGraph2(const char* file){
+	//readfile, obtain vertexs edges
+	int x,y;
+	int count_edges=0;
+	int count_vertices=0;
+	string user_a,user_b;
+	long double prob_edge;
+	//long double prob_a,prob_b;
+	
+	
+	
+	map<string, int>::iterator it;
+	ifstream infile(file);
+	
+	while(infile>>user_a>>user_b) {
+		//for a
+		it=user2ID.find(user_a);
+		if(it!=user2ID.end()){
+			//username.push_back(it->first);
+			x=it->second;
+			
+		}
+		else{
+			username.push_back(user_a);
+			user2ID[user_a]=count_vertices;
+			x=count_vertices++;
+			
+		}
+		
+		//for b
+		it=user2ID.find(user_b);
+		if(it!=user2ID.end()){
+			//username.push_back(it->first);
+			y=it->second;
+			in_deg[user_b]+=1;
+
+		}
+		else{
+			username.push_back(user_b);
+			user2ID[user_b]=count_vertices;
+			y=count_vertices++;
+			in_deg[user_b]=1;
+
+		}		
+		
+		
+		
+		count_edges++;
+		InputEdges.push_back(x);
+		InputEdges.push_back(y);	
+	}
+	
+	n=count_vertices;
+	m=count_edges;
+	
+	cout<<"number of users:"<<n<<" number of edges:"<<m<<"\n";
+	
+	
+	//viewpoint
+	vector<string>::iterator it_vector;
+	
+	// uniform distribution 
+	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();  
+    std::mt19937 gen(seed);  
+  
+    std::uniform_real_distribution<> dis(-1.0, 1.0);  
+    
+	
+	for(it_vector=username.begin();it_vector!=username.end();it_vector++)
+	{
+		double randomNumber = dis(gen);
+		viewpoint[*it_vector]=round(randomNumber * 10) / 10;
+	}
+
+	//EdgeProb
+	ifstream infile2(file);
+	while(infile2>>user_a>>user_b){
+		EdgeProb.push_back(1.0/in_deg[user_b]);
+	}
+	
+	if(adj_out.size()<n) adj_out.resize(n);
+	//outdegree adjacency table	 
+	for (int j=0; j<InputEdges.size(); j+=2){
+		//edge x -> y
+		x = InputEdges.at(j);	 
+		y = InputEdges.at(j+1);
+		int i=j/2;
+		adj_out[x].push_back(pair<int,double>(y,EdgeProb[i]));
+	}
+	adj_in.resize(n); 
+	//indegree adjacency table
+	for(int j=0;j<InputEdges.size();j+=2){
+		//edge x -> y
+		x=InputEdges.at(j);
+		y=InputEdges.at(j+1);
+		int i=j/2;
+ 
+		adj_in[y].push_back(pair<int,double>(x,EdgeProb[i])); 
+	} 
+
+	
+
+	
+	//userID_Name;
+	for(map<string, int>::iterator it_map=user2ID.begin();it_map!=user2ID.end();it_map++){
+		userID_Name[it_map->second]=it_map->first;
+	}
+	
+	
+	fprintf(stderr, "END reading graph (%s).\n", file); 
+	
+	
+
+}
+
+void clear(queue<int>& q) {
+    queue<int> empty;
+    swap(empty, q);
+}
 
 void findSpreader(int num_spreader){
 	//random select
@@ -302,25 +418,25 @@ void findSpreader(int num_spreader){
 	
 	
 	//divide S into I subsets
-	vector<string> spreader_for_one_view;
+	queue<int> spreader_for_one_view;
 	double viewp=-1.00;
 	int i=0;
 	while(!(viewp>1.00)){
 		//-1 or 1 
 		if(fabs(viewp-(-1.00))<1e-6 || fabs(viewp-1.00)<1e-6){
 			for(itt=Sh.begin();itt!=Sh.end();itt++){
-				if( fabs(viewpoint[*itt]-viewp)<1e-6 ) spreader_for_one_view.push_back(*itt);
+				if( fabs(viewpoint[*itt]-viewp)<1e-6 ) spreader_for_one_view.push(user2ID[*itt]);
 			}
 		}
 		else{
 			for(itt=Sb.begin();itt!=Sb.end();itt++){
-				if( fabs(viewpoint[*itt]-viewp)<1e-6 ) spreader_for_one_view.push_back(*itt);
+				if( fabs(viewpoint[*itt]-viewp)<1e-6 ) spreader_for_one_view.push(user2ID[*itt]);
 			}			
 		}
 		spreader[i]=spreader_for_one_view;
 		viewp+=0.10;
 		i++;
-		spreader_for_one_view.clear();
+		clear(spreader_for_one_view);
 	}
 	
 }
@@ -679,18 +795,17 @@ void DTree(int num_node,int num_edge,vector<pair<int,int> >& edges_source_mappin
 void HVB(int budget,double gamma,int round){
 	
 	
-	int theta=100;
 	
 	int J=2;
 	double vies[2]={-1.0,1.0};
 	//compute E[H(\emptyset)]
 	infharm=EHemptyset();
-
+	int theta=10000;
 	if(fabs(infharm-0)<=1e-6 ){
 		return;
 	}
-	int* zeta_visit=new int [n];		//flag
-	for(int i=0;i<n;i++)zeta_visit[i]=0;
+	vector<int> zeta_visit(n,0);		//flag
+	
 	double zeta_in_Bh=0.0;		//sum_result
 	vector<int> deleted(n,0);			//flag_delete_in_Bh
 	
@@ -804,8 +919,7 @@ void HVB(int budget,double gamma,int round){
 		cout<<"B_hsize "<<B_h.size()<<" maxzeta "<<maxzeta<<endl;
 		//delete zeta;
 	}
-	delete zeta_visit;
-	cout<<"rate£º"<<1.0-zeta_in_Bh/infharm<<endl;
+	cout<<"rateï¼š"<<1.0-zeta_in_Bh/infharm<<endl;
 	auto end = std::chrono::high_resolution_clock::now();  
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start); 
 	std::cout << "running time of HVB: " << duration.count() << "ms" << std::endl;
@@ -832,108 +946,11 @@ double computeDiversityofExposure(set<double> L){
 }
 
 
-double computedbe(set<int>& B){
-	
-
-	vector<int> Bset(n,0);
-	for(int elem: B_h){
- 		Bset[elem]=1;
-	}
-	for(int elem:B){
-		Bset[elem]=1;
-	}	
-
-
-	
-	int turns=1000;
-	
-	double dbe=0.0;
-	
-	const int vie_num=19;
-	double vies[vie_num];	//viewpoints
-	for(int i=0;i<vie_num;i++){
-		vies[i]=-0.9+i*0.1;
-		
-	}
-	
-	double initial=0.0;
-
-	
-	//cout<<"initial dbe: "<<initial<<endl;
-	
-	//map<double, vector<string> > spreader;
-		
-	while(turns--){
-		
-		vector<set<double> > L(n);
-		for(int v=0;v<n;v++){
-			L[v].insert(viewpoint[userID_Name[v]]);
-			initial+=computeDiversityofExposure(L[v])/n;
-		}
-		
-		for(int i=0;i<vie_num;i++){
-			
-			vector<string> resultlist_r1=spreader[i+1];	
-			vector<int> checked_r1(n,0);	
-			
-			
-			vector<string>::iterator it=resultlist_r1.begin();
-			for(;it!=resultlist_r1.end();it++){
-				checked_r1[user2ID[*it]]=1;
-			}			
-			
-			while(resultlist_r1.size()!=0){
-				
-				string current_node=resultlist_r1.front();
-				resultlist_r1.erase(resultlist_r1.begin());
-				
-				int current_id=user2ID[current_node];
-				L[current_id].insert(vies[i]);
-	
-				//select out-neighbors of the current_node
-				for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-					
-					double edgepro=(*it_list).second;
-					
-					double nodepro=1.0;
-					string username_v=userID_Name[(*it_list).first];
-					
-					if(Bset[(*it_list).first]==1){
-						nodepro=1.0;
-					}
-					else{
-						nodepro=1.0-fabs(vies[i]-viewpoint[username_v])/2;					
-					}
-					
-					if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-						checked_r1[(*it_list).first]=1;
-						resultlist_r1.push_back(username_v);
-					}
-				}	
-			}			
-			
-			
-		}
-		
-		
-		//compute dbe
-		for(int v=0;v<n;v++){
-			dbe+=computeDiversityofExposure(L[v])/n/1000;
-		}
-	}
-	
-	
-	return dbe;
-	
-}
-
-
 void DBEM2(int budget,int k,int round){
-	const int theta=3000;
 	int litk=budget;		//remaining budget 
 	set<int> CP;	
 	set<int> CP_upper;
-
+	const int theta=5000;
 	int target_node[theta];	//target_node
 	for(int i=0;i<theta;i++) target_node[i]=-1;	
 	const int vie_num=19;
@@ -953,27 +970,9 @@ void DBEM2(int budget,int k,int round){
 
 	
 
-	int*** upath=new int**[n];
-	int*** spath=new int**[n];
-	int*** upath_upper=new int **[n];
-	int *** upath_for_B_b =new int **[n];
-	for(int i=0;i<n;i++){						//node id 
-		upath[i]=new int*[theta];
-		spath[i]=new int*[theta];
-		upath_upper[i]=new int*[theta];
-		upath_for_B_b[i]=new int*[theta];
-		for(int j=0;j<theta;j++){				//graph
-			upath[i][j]=new int[vie_num];
-			spath[i][j]=new int[vie_num];
-			upath_upper[i][j]=new int[vie_num];
-
-			upath_for_B_b[i][j]=new int[vie_num];
-			for(int l=0;l<vie_num;l++){			//viewpoints
-				upath_for_B_b[i][j][l]=upath[i][j][l]=spath[i][j][l]=upath_upper[i][j][l]=0;
-			}
-		}
-	}
-	
+	vector<vector<vector<int>>> upath(n,vector<std::vector<int>>(theta,vector<int>(vie_num, 0)));
+	vector<vector<vector<int>>> spath(n,vector<std::vector<int>>(theta,vector<int>(vie_num, 0)));
+	vector<vector<vector<int>>> upath_upper(n,vector<std::vector<int>>(theta,vector<int>(vie_num, 0)));
 	
 	auto start = std::chrono::high_resolution_clock::now();  		
 	for(int i=0;i<theta;i++){
@@ -1010,7 +1009,6 @@ void DBEM2(int budget,int k,int round){
 						v.push(w);
 						upath[w][i][j]=1;
 						upath_upper[w][i][j]=1;
-						upath_for_B_b[w][i][j]=1;	
 						v_visit[w]=1;					
 					}		
 						
@@ -1099,7 +1097,7 @@ void DBEM2(int budget,int k,int round){
 	}
 	
 	phi_empty=phi_empty*n/theta;
-	cout<<"Minimum£º"<<phi_empty/n<<endl;
+	cout<<"Minimumï¼š"<<phi_empty/n<<endl;
 	
 	int budget_lower=budget;
 	int budget_upper=budget;
@@ -1176,10 +1174,10 @@ void DBEM2(int budget,int k,int round){
 		
 	}
 
-	cout<<"lower bound£º"<<phi_lower_bound/n<<endl;
+	cout<<"lower boundï¼š"<<phi_lower_bound/n<<endl;
 
 
-	//ÉÏ½ç 
+	//ä¸Šç•Œ 
 	double phi_upper_bound=phi_empty;
 	
 	while(B_b_upper.size()<budget_upper){
@@ -1228,9 +1226,6 @@ void DBEM2(int budget,int k,int round){
 		//update CP_upper
 		CP_upper.erase(index);
 		
-		
-
-		
 		if(B_h.find(index)!=B_h.end()) budget_upper=budget_upper+1;	
 	} 	
 	
@@ -1252,13 +1247,14 @@ void DBEM2(int budget,int k,int round){
 	}	
 	
 	
-	cout<<"upper bound£º"<<phi_upper_bound/n<<endl;
+	cout<<"upper boundï¼š"<<phi_upper_bound/n<<endl;
 	
 	
 	vector<int> visited_B_b(n,0); 
 	
 	double phi=phi_empty;	//result
 	
+		
 	while(B_b.size()<budget){
 		int index=-1;
 		double maxdeltaDE=-1;	
@@ -1362,11 +1358,14 @@ void DBEM2(int budget,int k,int round){
 		}
 		 
 		
-		if(B_h.find(index)!=B_h.end()) budget=budget+1;
-		
+		if(B_h.find(index)!=B_h.end()) {
+			budget=budget+1;
+		}
 	}
-	cout<<"beforebh:"<<phi/n<<endl; 
 	//+B_h
+	
+	double phi_sep=phi; 
+	
 	for(auto& elem:B_h){
 		for(int i=0;i<theta;i++){
 			set<double> temp=target_node_view[i];
@@ -1381,1445 +1380,21 @@ void DBEM2(int budget,int k,int round){
 		}
 		
 	}
-	cout<<"HGA£º"<<phi/n<<endl;
-
-	
-	
-	for(int i=0;i<n;i++){
-		for(int j=0;j<theta;j++){
-			delete[] upath[i][j];
-			delete[] spath[i][j];
-			delete[] upath_upper[i][j];
-			delete[] upath_for_B_b[i][j];
-		}
-		delete[] upath[i];
-		delete[] spath[i];
-		delete[] upath_upper[i];
-		delete[] upath_for_B_b[i];
-	}
-	delete[] upath;	
-	delete[] spath;
-	delete[] upath_upper;
-	delete[] upath_for_B_b;
-	
-	
-	//B_b + B_h
-	//for(auto&elem:B_h){
-	//	B_b.insert(elem);
-	//} 
-	
+	cout<<"HGAï¼š"<<phi/n<<endl;
 	
 	auto end = std::chrono::high_resolution_clock::now(); 
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);  
 	cout << "running time of DBEM: " << duration.count() << "ms" << std::endl;
 
-	//ÓÐ B_b_lower, B_b , B_b_upper
-
-
-	double dbe_lower=computedbe(B_b_lower);
-	double dbe_upper=computedbe(B_b_upper);
-	double dbe=computedbe(B_b);
-	
-	cout<<"sigma(B_b_lower+B_h): "<<dbe_lower<<endl;
-	cout<<"sigma(B_b_upper+B_h): "<<dbe_upper<<endl;
-	cout<<"sigma(B_b+B_h): "<<dbe<<endl;
-	
 }
 
 
-
-
-
-void OD_HVB(int budget, int k, int round){
-	
-	vector<pair<int, int>> outDegrees; // To store node and its out-degree
- 
-    // Calculate out-degree for each node
-    for (size_t i = 0; i < adj_out.size(); ++i) {
-        int outDegree = adj_out[i].size();
-        outDegrees.push_back(make_pair(i, outDegree));
-    }
- 
-    // Sort nodes by out-degree in descending order
-    sort(outDegrees.begin(), outDegrees.end(), [](const pair<int, int>& a, const pair<int, int>& b) {
-        return a.second > b.second;
-    });
- 
-    // Extract the top k nodes with the highest out-degree
-    vector<int> topNodes;
-    double totalcost=0.0; 
-    for (int i = 0; i < budget; ++i) {
-		topNodes.push_back(outDegrees[i].first);
-    }	
-
-
-	vector<int> Bset(n,0);
-	for(int elem: B_h){
- 		Bset[elem]=1;
-	}
-	for(auto & elem:topNodes){
-		Bset[elem]=1;
-	}	
-
-
-	
-	int turns=1000;
-	
-	double Eh=EHemptyset();
-	
-	//-1 and 1
-	set<string> harm_users;
-	double influence_harm=0.0;
-
-	while(turns--){
-		vector<string> resultlist_r1;	//viewpoint "-1"
-		vector<int> checked_r1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-(-1) )<1e-6 ) resultlist_r1.push_back(*it_sh);
-		}
-		
-		vector<string>::iterator it=resultlist_r1.begin();
-		for(;it!=resultlist_r1.end();it++){
-			checked_r1[user2ID[*it]]=1;
-		}
-		
-	
-		while(resultlist_r1.size()!=0){
-			
-			string current_node=resultlist_r1.front();
-			resultlist_r1.erase(resultlist_r1.begin());
-			
-			harm_users.insert(current_node);
-
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-				
-				if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_r1[(*it_list).first]=1;
-					resultlist_r1.push_back(username_v);
-				}
-			}	
-		}	
-		
-		
-		
-		
-		vector<string> resultlist_s1;	// viewpoint "1"
-		vector<int> checked_s1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-1 )<1e-6 ) resultlist_s1.push_back(*it_sh);
-		}
-		
-		
-		it=resultlist_s1.begin();
-		for(;it!=resultlist_s1.end();it++){
-			checked_s1[user2ID[*it]]=1;
-		}
-		
-
-		while(resultlist_s1.size()!=0){
-			
-			string current_node=resultlist_s1.front();
-			resultlist_s1.erase(resultlist_s1.begin());
-			
-			harm_users.insert(current_node);
-			
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-
-				if(checked_s1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_s1[(*it_list).first]=1;
-					resultlist_s1.push_back(username_v);
-				}
-			}	
-		}
-		
-		influence_harm+=(harm_users.size() - Sh.size() );
-		harm_users.clear();
-	} 
-	
-	
-	influence_harm=1.0*influence_harm/1000;	
-	
-		cout<<"____________________OD_HVB_____________________"<<endl;
-	
-	cout<<"Eh"<<Eh<<endl;
-	cout<<"Eh[B_h]"<<influence_harm<<endl;
-	cout<<"rate: "<<influence_harm/Eh<<endl;
-	
-	
-	turns=1000;
-	double dbe=0.0;
-	
-	const int vie_num=19;
-	double vies[vie_num];	//viewpoints
-	for(int i=0;i<vie_num;i++){
-		vies[i]=-0.9+i*0.1;
-		
-	}
-	
-
-	
-	//map<double, vector<string> > spreader;
-		
-	while(turns--){
-		vector<set<double> > L(n);
-		for(int v=0;v<n;v++){
-			L[v].insert(viewpoint[userID_Name[v]]);
-		}
-		for(int i=0;i<vie_num;i++){
-			
-			vector<string> resultlist_r1=spreader[i+1];	
-			vector<int> checked_r1(n,0);	
-			
-			
-			vector<string>::iterator it=resultlist_r1.begin();
-			for(;it!=resultlist_r1.end();it++){
-				checked_r1[user2ID[*it]]=1;
-			}			
-			
-			while(resultlist_r1.size()!=0){
-				
-				string current_node=resultlist_r1.front();
-				resultlist_r1.erase(resultlist_r1.begin());
-				
-				int current_id=user2ID[current_node];
-				L[current_id].insert(vies[i]);
-	
-				//select out-neighbors of the current_node
-				for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-					
-					double edgepro=(*it_list).second;
-					
-					double nodepro=1.0;
-					string username_v=userID_Name[(*it_list).first];
-					
-					if(Bset[(*it_list).first]==1){
-						nodepro=1.0;
-					}
-					else{
-						nodepro=1.0-fabs(vies[i]-viewpoint[username_v])/2;			
-					}
-					
-					if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-						checked_r1[(*it_list).first]=1;
-						resultlist_r1.push_back(username_v);
-					}
-				}	
-			}			
-			
-			
-		}
-
-		//compute dbe
-		for(int v=0;v<n;v++){
-			dbe+=computeDiversityofExposure(L[v])/n/1000;
-		}		
-	}
-	
-	cout<<dbe<<endl;
-	
-}
-
-void OD(int budget, int round){
-	
-	vector<pair<int, int>> outDegrees; // To store node and its out-degree
- 
-    // Calculate out-degree for each node
-    for (size_t i = 0; i < adj_out.size(); ++i) {
-        int outDegree = adj_out[i].size();
-        outDegrees.push_back(make_pair(i, outDegree));
-    }
- 
-    // Sort nodes by out-degree in descending order
-    sort(outDegrees.begin(), outDegrees.end(), [](const pair<int, int>& a, const pair<int, int>& b) {
-        return a.second > b.second;
-    });
- 
-    // Extract the top k nodes with the highest out-degree
-    vector<int> topNodes;
-    double totalcost=0.0; 
-    for (int i = 0; i < budget; ++i) {
-		topNodes.push_back(outDegrees[i].first);
-    }	
-
-
-	vector<int> Bset(n,0);
-
-	for(auto & elem:topNodes){
-		Bset[elem]=1;
-	}	
-
-
-	
-	int turns=1000;
-	
-	double Eh=EHemptyset();
-	
-	//-1 and 1
-	set<string> harm_users;
-	double influence_harm=0.0;
-
-	while(turns--){
-		vector<string> resultlist_r1;	//viewpoint "-1"
-		vector<int> checked_r1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-(-1) )<1e-6 ) resultlist_r1.push_back(*it_sh);
-		}
-		
-		vector<string>::iterator it=resultlist_r1.begin();
-		for(;it!=resultlist_r1.end();it++){
-			checked_r1[user2ID[*it]]=1;
-		}
-		
-	
-		while(resultlist_r1.size()!=0){
-			
-			string current_node=resultlist_r1.front();
-			resultlist_r1.erase(resultlist_r1.begin());
-			
-			harm_users.insert(current_node);
-
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-				
-				if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_r1[(*it_list).first]=1;
-					resultlist_r1.push_back(username_v);
-				}
-			}	
-		}	
-		
-		
-		
-		
-		vector<string> resultlist_s1;	// viewpoint "1"
-		vector<int> checked_s1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-1 )<1e-6 ) resultlist_s1.push_back(*it_sh);
-		}
-		
-		
-		it=resultlist_s1.begin();
-		for(;it!=resultlist_s1.end();it++){
-			checked_s1[user2ID[*it]]=1;
-		}
-		
-
-		while(resultlist_s1.size()!=0){
-			
-			string current_node=resultlist_s1.front();
-			resultlist_s1.erase(resultlist_s1.begin());
-			
-			harm_users.insert(current_node);
-			
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-
-				if(checked_s1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_s1[(*it_list).first]=1;
-					resultlist_s1.push_back(username_v);
-				}
-			}	
-		}
-		
-		influence_harm+=(harm_users.size() - Sh.size() );
-		harm_users.clear();
-	} 
-	
-	
-	influence_harm=1.0*influence_harm/1000;	
-	
-	cout<<"____________________OD_____________________"<<endl;
-	
-	cout<<"Eh: "<<Eh<<endl;
-	cout<<"Eh[B_h]: "<<influence_harm<<endl;
-	cout<<"rate: "<<influence_harm/Eh<<endl;
-	
-	
-	turns=1000;
-	double dbe=0.0;
-	
-	const int vie_num=19;
-	double vies[vie_num];	//viewpoints
-	for(int i=0;i<vie_num;i++){
-		vies[i]=-0.9+i*0.1;
-		
-	}
-	
-
-	
-	
-	
-	//map<double, vector<string> > spreader;
-		
-	while(turns--){
-		
-		vector<set<double> > L(n);
-		for(int v=0;v<n;v++){
-			L[v].insert(viewpoint[userID_Name[v]]);
-		}
-		for(int i=0;i<vie_num;i++){
-			
-			vector<string> resultlist_r1=spreader[i+1];	
-			vector<int> checked_r1(n,0);
-
-			vector<string>::iterator it=resultlist_r1.begin();
-			for(;it!=resultlist_r1.end();it++){
-				checked_r1[user2ID[*it]]=1;
-			}
-				
-		
-			while(resultlist_r1.size()!=0){
-				
-				string current_node=resultlist_r1.front();
-				resultlist_r1.erase(resultlist_r1.begin());
-				
-				int current_id=user2ID[current_node];
-				L[current_id].insert(vies[i]);
-	
-				//select out-neighbors of the current_node
-				for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-					
-					double edgepro=(*it_list).second;
-					
-					double nodepro=1.0;
-					string username_v=userID_Name[(*it_list).first];
-					
-					if(Bset[(*it_list).first]==1){
-						nodepro=1.0;
-					}
-					else{
-						nodepro=1.0-fabs(vies[i]-viewpoint[username_v])/2;			
-					}
-					
-					if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-						checked_r1[(*it_list).first]=1;
-						resultlist_r1.push_back(username_v);
-					}
-				}	
-			}			
-			
-			
-		}
-
-		//compute dbe
-		for(int v=0;v<n;v++){
-			dbe+=computeDiversityofExposure(L[v])/n/1000;
-		}		
-	}
-	
-
-	cout<<dbe<<endl;	
-}
-
-void ID_HVB(int budget, int k, int round){
-	
-	vector<pair<int, int>> inDegrees; // To store node and its out-degree
- 
-    // Calculate out-degree for each node
-    for (size_t i = 0; i < adj_in.size(); ++i) {
-        int inDegree = adj_in[i].size();
-        inDegrees.push_back(make_pair(i, inDegree));
-    }
- 
-    // Sort nodes by out-degree in descending order
-    sort(inDegrees.begin(), inDegrees.end(), [](const pair<int, int>& a, const pair<int, int>& b) {
-        return a.second > b.second;
-    });
- 
-    // Extract the top k nodes with the highest out-degree
-    vector<int> topNodes;
-    double totalcost=0.0; 
-    for (int i = 0; i < budget; ++i) {
-		topNodes.push_back(inDegrees[i].first);
-    }	
-
-
-	vector<int> Bset(n,0);
-	for(int elem: B_h){
- 		Bset[elem]=1;
-	}
-	for(auto & elem:topNodes){
-		Bset[elem]=1;
-	}	
-
-
-	
-	int turns=1000;
-	
-	double Eh=EHemptyset();
-	
-	//-1 and 1
-	set<string> harm_users;
-	double influence_harm=0.0;
-
-	while(turns--){
-		vector<string> resultlist_r1;	//viewpoint "-1"
-		vector<int> checked_r1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-(-1) )<1e-6 ) resultlist_r1.push_back(*it_sh);
-		}
-		
-		vector<string>::iterator it=resultlist_r1.begin();
-		for(;it!=resultlist_r1.end();it++){
-			checked_r1[user2ID[*it]]=1;
-		}
-		
-	
-		while(resultlist_r1.size()!=0){
-			
-			string current_node=resultlist_r1.front();
-			resultlist_r1.erase(resultlist_r1.begin());
-			
-			harm_users.insert(current_node);
-
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-				
-				if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_r1[(*it_list).first]=1;
-					resultlist_r1.push_back(username_v);
-				}
-			}	
-		}	
-		
-		
-		
-		
-		vector<string> resultlist_s1;	// viewpoint "1"
-		vector<int> checked_s1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-1 )<1e-6 ) resultlist_s1.push_back(*it_sh);
-		}
-		
-		
-		it=resultlist_s1.begin();
-		for(;it!=resultlist_s1.end();it++){
-			checked_s1[user2ID[*it]]=1;
-		}
-		
-
-		while(resultlist_s1.size()!=0){
-			
-			string current_node=resultlist_s1.front();
-			resultlist_s1.erase(resultlist_s1.begin());
-			
-			harm_users.insert(current_node);
-			
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-
-				if(checked_s1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_s1[(*it_list).first]=1;
-					resultlist_s1.push_back(username_v);
-				}
-			}	
-		}
-		
-		influence_harm+=(harm_users.size() - Sh.size() );
-		harm_users.clear();
-	} 
-	
-	
-	influence_harm=1.0*influence_harm/1000;	
-	
-	cout<<"____________________ID_HVB_____________________"<<endl;
-	
-	cout<<"Eh"<<Eh<<endl;
-	cout<<"Eh[B_h]"<<influence_harm<<endl;
-	cout<<"rate: "<<influence_harm/Eh<<endl;
-	
-	
-	turns=1000;
-	double dbe=0.0;
-	
-	const int vie_num=19;
-	double vies[vie_num];	//viewpoints
-	for(int i=0;i<vie_num;i++){
-		vies[i]=-0.9+i*0.1;
-		
-	}
-	
-	//map<double, vector<string> > spreader;
-		
-	while(turns--){
-		vector<set<double> > L(n);
-		for(int v=0;v<n;v++){
-			L[v].insert(viewpoint[userID_Name[v]]);
-		}
-	
-		for(int i=0;i<vie_num;i++){
-			
-			vector<string> resultlist_r1=spreader[i+1];	
-			vector<int> checked_r1(n,0);	
-			
-			
-			vector<string>::iterator it=resultlist_r1.begin();
-			for(;it!=resultlist_r1.end();it++){
-				checked_r1[user2ID[*it]]=1;
-			}			
-			
-			while(resultlist_r1.size()!=0){
-				
-				string current_node=resultlist_r1.front();
-				resultlist_r1.erase(resultlist_r1.begin());
-				
-				int current_id=user2ID[current_node];
-				L[current_id].insert(vies[i]);
-	
-				//select out-neighbors of the current_node
-				for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-					
-					double edgepro=(*it_list).second;
-					
-					double nodepro=1.0;
-					string username_v=userID_Name[(*it_list).first];
-					
-					if(Bset[(*it_list).first]==1){
-						nodepro=1.0;
-					}
-					else{
-						nodepro=1.0-fabs(vies[i]-viewpoint[username_v])/2;				
-					}
-					
-					if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-						checked_r1[(*it_list).first]=1;
-						resultlist_r1.push_back(username_v);
-					}
-				}	
-			}			
-			
-			
-		}
-		//compute dbe
-		for(int v=0;v<n;v++){
-			dbe+=computeDiversityofExposure(L[v])/n/1000;
-		}	
-		
-	}
-
-	cout<<dbe<<endl;	
-}
-
-void ID(int budget, int round){
-	
-	vector<pair<int, int>> inDegrees; // To store node and its out-degree
- 
-    // Calculate out-degree for each node
-    for (size_t i = 0; i < adj_in.size(); ++i) {
-        int inDegree = adj_in[i].size();
-        inDegrees.push_back(make_pair(i, inDegree));
-    }
- 
-    // Sort nodes by out-degree in descending order
-    sort(inDegrees.begin(), inDegrees.end(), [](const pair<int, int>& a, const pair<int, int>& b) {
-        return a.second > b.second;
-    });
- 
-    // Extract the top k nodes with the highest out-degree
-    vector<int> topNodes;
-    double totalcost=0.0; 
-    for (int i = 0; i < budget; ++i) {
-		topNodes.push_back(inDegrees[i].first);
-    }	
-
-
-	vector<int> Bset(n,0);
-
-	for(auto & elem:topNodes){
-		Bset[elem]=1;
-	}	
-
-
-	
-	int turns=1000;
-	
-	double Eh=EHemptyset();
-	
-	//-1 and 1
-	set<string> harm_users;
-	double influence_harm=0.0;
-
-	while(turns--){
-		vector<string> resultlist_r1;	//viewpoint "-1"
-		vector<int> checked_r1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-(-1) )<1e-6 ) resultlist_r1.push_back(*it_sh);
-		}
-		
-		vector<string>::iterator it=resultlist_r1.begin();
-		for(;it!=resultlist_r1.end();it++){
-			checked_r1[user2ID[*it]]=1;
-		}
-		
-	
-		while(resultlist_r1.size()!=0){
-			
-			string current_node=resultlist_r1.front();
-			resultlist_r1.erase(resultlist_r1.begin());
-			
-			harm_users.insert(current_node);
-
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-				
-				if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_r1[(*it_list).first]=1;
-					resultlist_r1.push_back(username_v);
-				}
-			}	
-		}	
-		
-		
-		
-		
-		vector<string> resultlist_s1;	// viewpoint "1"
-		vector<int> checked_s1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-1 )<1e-6 ) resultlist_s1.push_back(*it_sh);
-		}
-		
-		
-		it=resultlist_s1.begin();
-		for(;it!=resultlist_s1.end();it++){
-			checked_s1[user2ID[*it]]=1;
-		}
-		
-
-		while(resultlist_s1.size()!=0){
-			
-			string current_node=resultlist_s1.front();
-			resultlist_s1.erase(resultlist_s1.begin());
-			
-			harm_users.insert(current_node);
-			
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-
-				if(checked_s1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_s1[(*it_list).first]=1;
-					resultlist_s1.push_back(username_v);
-				}
-			}	
-		}
-		
-		influence_harm+=(harm_users.size() - Sh.size() );
-		harm_users.clear();
-	} 
-	
-	
-	influence_harm=1.0*influence_harm/1000;	
-	
-	cout<<"____________________ID_____________________"<<endl;
-	
-	cout<<"Eh: "<<Eh<<endl;
-	cout<<"Eh[B_h]: "<<influence_harm<<endl;
-	cout<<"rate: "<<influence_harm/Eh<<endl;
-	
-	
-	turns=1000;
-	double dbe=0.0;
-	
-	const int vie_num=19;
-	double vies[vie_num];	//viewpoints
-	for(int i=0;i<vie_num;i++){
-		vies[i]=-0.9+i*0.1;
-		
-	}	
-	
-	//map<double, vector<string> > spreader;
-		
-	while(turns--){
-		vector<set<double> > L(n);
-		for(int v=0;v<n;v++){
-			L[v].insert(viewpoint[userID_Name[v]]);
-		}	
-	
-	
-		for(int i=0;i<vie_num;i++){
-			
-			vector<string> resultlist_r1=spreader[i+1];	
-			vector<int> checked_r1(n,0);	
-			
-			
-			vector<string>::iterator it=resultlist_r1.begin();
-			for(;it!=resultlist_r1.end();it++){
-				checked_r1[user2ID[*it]]=1;
-			}			
-			
-			while(resultlist_r1.size()!=0){
-				
-				string current_node=resultlist_r1.front();
-				resultlist_r1.erase(resultlist_r1.begin());
-				
-				int current_id=user2ID[current_node];
-				L[current_id].insert(vies[i]);
-	
-				//select out-neighbors of the current_node
-				for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-					
-					double edgepro=(*it_list).second;
-					
-					double nodepro=1.0;
-					string username_v=userID_Name[(*it_list).first];
-					
-					if(Bset[(*it_list).first]==1){
-						nodepro=1.0;
-					}
-					else{
-						nodepro=1.0-fabs(vies[i]-viewpoint[username_v])/2;						
-					}
-					
-					if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-						checked_r1[(*it_list).first]=1;
-						resultlist_r1.push_back(username_v);
-					}
-				}	
-			}			
-			
-			
-		}
-
-		//compute dbe
-		for(int v=0;v<n;v++){
-			dbe+=computeDiversityofExposure(L[v])/n/1000;
-		}
-		
-	}
-	
-	cout<<dbe<<endl;	
-}
-
-
-
-void PR_HVB(int budget, int k, int round){
-	
-	const double DAMPING_FACTOR = 0.85;
-	const double EPSILON = 1e-6;
-	vector<double> pageRank(n, 1.0 / n);
-	
-	vector<double> outDegreeSum(n, 0);
-        
-    // Calculate the sum of out-degrees (weights) for each node
-    for (int u = 0; u < n; ++u) {
-        for (const auto& edge : adj_out[u]) {
-            outDegreeSum[u] += edge.second;
-        }
-    }
-
-    bool converged = false;
-    while (!converged) {
-        vector<double> newPageRank(n, 0);
-        
-        for (int u = 0; u < n; ++u) {
-            if (outDegreeSum[u] == 0) continue; // Handle dangling nodes
-            
-            for (const auto& edge : adj_out[u]) {
-                int v = edge.first;
-                double weight = edge.second;
-                newPageRank[v] += pageRank[u] * weight / outDegreeSum[u];
-            }
-        }
-
-        double sum = 0;
-        for (int u = 0; u < n; ++u) {
-            newPageRank[u] = (1 - DAMPING_FACTOR) / n + DAMPING_FACTOR * newPageRank[u];
-            sum += fabs(newPageRank[u] - pageRank[u]);
-            pageRank[u] = newPageRank[u];
-        }
-
-        if (sum < EPSILON) {
-            converged = true;
-        }
-    }
-    
-    vector<pair<double, int>> valueIndexPairs;
-	for (int i = 0; i < pageRank.size(); ++i) {
-	    valueIndexPairs.push_back({pageRank[i], i});
-	}
-	// °´Öµ½µÐòÅÅÐò
-   
-	sort(valueIndexPairs.begin(), valueIndexPairs.end(), [](const pair<double, int>& a, const pair<double, int>& b) {        
-		return a.first > b.first;
-	});
-	
-    // Extract the top k nodes with the highest out-degree
-    vector<int> topNodes;
-    double totalcost=0.0; 
-    for (int i = 0; i < budget; ++i) {
-		topNodes.push_back(valueIndexPairs[i].second);
-    }	
-
-
-	vector<int> Bset(n,0);
-	for(int elem: B_h){
- 		Bset[elem]=1;
-	}
-	for(auto & elem:topNodes){
-		Bset[elem]=1;
-	}	
-
-
-	
-	int turns=1000;
-	
-	double Eh=EHemptyset();
-	
-	//-1 and 1
-	set<string> harm_users;
-	double influence_harm=0.0;
-
-	while(turns--){
-		vector<string> resultlist_r1;	//viewpoint "-1"
-		vector<int> checked_r1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-(-1) )<1e-6 ) resultlist_r1.push_back(*it_sh);
-		}
-		
-		vector<string>::iterator it=resultlist_r1.begin();
-		for(;it!=resultlist_r1.end();it++){
-			checked_r1[user2ID[*it]]=1;
-		}
-		
-	
-		while(resultlist_r1.size()!=0){
-			
-			string current_node=resultlist_r1.front();
-			resultlist_r1.erase(resultlist_r1.begin());
-			
-			harm_users.insert(current_node);
-
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-				
-				if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_r1[(*it_list).first]=1;
-					resultlist_r1.push_back(username_v);
-				}
-			}	
-		}	
-		
-		
-		
-		
-		vector<string> resultlist_s1;	// viewpoint "1"
-		vector<int> checked_s1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-1 )<1e-6 ) resultlist_s1.push_back(*it_sh);
-		}
-		
-		
-		it=resultlist_s1.begin();
-		for(;it!=resultlist_s1.end();it++){
-			checked_s1[user2ID[*it]]=1;
-		}
-		
-
-		while(resultlist_s1.size()!=0){
-			
-			string current_node=resultlist_s1.front();
-			resultlist_s1.erase(resultlist_s1.begin());
-			
-			harm_users.insert(current_node);
-			
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-
-				if(checked_s1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_s1[(*it_list).first]=1;
-					resultlist_s1.push_back(username_v);
-				}
-			}	
-		}
-		
-		influence_harm+=(harm_users.size() - Sh.size() );
-		harm_users.clear();
-	} 
-	
-	
-	influence_harm=1.0*influence_harm/1000;	
-	
-		cout<<"____________________PR_HVB_____________________"<<endl;
-	
-	cout<<"Eh"<<Eh<<endl;
-	cout<<"Eh[B_h]"<<influence_harm<<endl;
-	cout<<"rate: "<<influence_harm/Eh<<endl;
-	
-	
-	turns=1000;
-	double dbe=0.0;
-	
-	const int vie_num=19;
-	double vies[vie_num];	//viewpoints
-	for(int i=0;i<vie_num;i++){
-		vies[i]=-0.9+i*0.1;
-		
-	}
-	
-	vector<set<double> > L(n);
-	for(int v=0;v<n;v++){
-		L[v].insert(viewpoint[userID_Name[v]]);
-	}
-	
-	
-	
-	//map<double, vector<string> > spreader;
-		
-	while(turns--){
-		for(int i=0;i<vie_num;i++){
-			
-			vector<string> resultlist_r1=spreader[i+1];	
-			vector<int> checked_r1(n,0);	
-			
-			
-			vector<string>::iterator it=resultlist_r1.begin();
-			for(;it!=resultlist_r1.end();it++){
-				checked_r1[user2ID[*it]]=1;
-			}			
-			
-			while(resultlist_r1.size()!=0){
-				
-				string current_node=resultlist_r1.front();
-				resultlist_r1.erase(resultlist_r1.begin());
-				
-				int current_id=user2ID[current_node];
-				L[current_id].insert(vies[i]);
-	
-				//select out-neighbors of the current_node
-				for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-					
-					double edgepro=(*it_list).second;
-					
-					double nodepro=1.0;
-					string username_v=userID_Name[(*it_list).first];
-					
-					if(Bset[(*it_list).first]==1){
-						nodepro=1.0;
-					}
-					else{
-						nodepro=1.0-fabs(vies[i]-viewpoint[username_v])/2;			
-					}
-					
-					if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-						checked_r1[(*it_list).first]=1;
-						resultlist_r1.push_back(username_v);
-					}
-				}	
-			}			
-			
-			
-		}
-		
-	}
-	
-	//compute dbe
-	for(int v=0;v<n;v++){
-		dbe+=computeDiversityofExposure(L[v])/n;
-	}
-
-	cout<<dbe<<endl;
-	
-}
-
-void PR(int budget, int round){
-	
-	const double DAMPING_FACTOR = 0.85;
-	const double EPSILON = 1e-6;
-	vector<double> pageRank(n, 1.0 / n);
-	
-	vector<double> outDegreeSum(n, 0);
-        
-    // Calculate the sum of out-degrees (weights) for each node
-    for (int u = 0; u < n; ++u) {
-        for (const auto& edge : adj_out[u]) {
-            outDegreeSum[u] += edge.second;
-        }
-    }
-
-    bool converged = false;
-    while (!converged) {
-        vector<double> newPageRank(n, 0);
-        
-        for (int u = 0; u < n; ++u) {
-            if (outDegreeSum[u] == 0) continue; // Handle dangling nodes
-            
-            for (const auto& edge : adj_out[u]) {
-                int v = edge.first;
-                double weight = edge.second;
-                newPageRank[v] += pageRank[u] * weight / outDegreeSum[u];
-            }
-        }
-
-        double sum = 0;
-        for (int u = 0; u < n; ++u) {
-            newPageRank[u] = (1 - DAMPING_FACTOR) / n + DAMPING_FACTOR * newPageRank[u];
-            sum += fabs(newPageRank[u] - pageRank[u]);
-            pageRank[u] = newPageRank[u];
-        }
-
-        if (sum < EPSILON) {
-            converged = true;
-        }
-    }
-    
-    vector<pair<double, int>> valueIndexPairs;
-	for (int i = 0; i < pageRank.size(); ++i) {
-	    valueIndexPairs.push_back({pageRank[i], i});
-	}
-	// °´Öµ½µÐòÅÅÐò
-   
-	sort(valueIndexPairs.begin(), valueIndexPairs.end(), [](const pair<double, int>& a, const pair<double, int>& b) {        
-		return a.first > b.first;
-	});
-	
-    // Extract the top k nodes with the highest out-degree
-    vector<int> topNodes;
-    double totalcost=0.0; 
-    for (int i = 0; i < budget; ++i) {
-		topNodes.push_back(valueIndexPairs[i].second);
-    }	
-
-
-	vector<int> Bset(n,0);
-
-	for(auto & elem:topNodes){
-		Bset[elem]=1;
-	}	
-
-
-	
-	int turns=1000;
-	
-	double Eh=EHemptyset();
-	
-	//-1 and 1
-	set<string> harm_users;
-	double influence_harm=0.0;
-
-	while(turns--){
-		vector<string> resultlist_r1;	//viewpoint "-1"
-		vector<int> checked_r1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-(-1) )<1e-6 ) resultlist_r1.push_back(*it_sh);
-		}
-		
-		vector<string>::iterator it=resultlist_r1.begin();
-		for(;it!=resultlist_r1.end();it++){
-			checked_r1[user2ID[*it]]=1;
-		}
-		
-	
-		while(resultlist_r1.size()!=0){
-			
-			string current_node=resultlist_r1.front();
-			resultlist_r1.erase(resultlist_r1.begin());
-			
-			harm_users.insert(current_node);
-
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-				
-				if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_r1[(*it_list).first]=1;
-					resultlist_r1.push_back(username_v);
-				}
-			}	
-		}	
-		
-		
-		
-		
-		vector<string> resultlist_s1;	// viewpoint "1"
-		vector<int> checked_s1(n,0);	
-		
-		for(vector<string>::iterator it_sh=Sh.begin();it_sh!=Sh.end();it_sh++){
-			if( fabs(viewpoint[*it_sh]-1 )<1e-6 ) resultlist_s1.push_back(*it_sh);
-		}
-		
-		
-		it=resultlist_s1.begin();
-		for(;it!=resultlist_s1.end();it++){
-			checked_s1[user2ID[*it]]=1;
-		}
-		
-
-		while(resultlist_s1.size()!=0){
-			
-			string current_node=resultlist_s1.front();
-			resultlist_s1.erase(resultlist_s1.begin());
-			
-			harm_users.insert(current_node);
-			
-			//select out-neighbors of the current_node
-			for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-				
-				double edgepro=(*it_list).second;
-				
-				double nodepro=0.0;
-				string username_v=userID_Name[(*it_list).first];
-				if(Bset[(*it_list).first]==1){
-					nodepro=0.0;
-				}
-				else{
-					nodepro=1.0-fabs(-1.0-viewpoint[username_v])/2;					
-				}
-
-				if(checked_s1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-					checked_s1[(*it_list).first]=1;
-					resultlist_s1.push_back(username_v);
-				}
-			}	
-		}
-		
-		influence_harm+=(harm_users.size() - Sh.size() );
-		harm_users.clear();
-	} 
-	
-	
-	influence_harm=1.0*influence_harm/1000;	
-	
-	cout<<"____________________PR_____________________"<<endl;
-	
-	cout<<"Eh: "<<Eh<<endl;
-	cout<<"Eh[B_h]: "<<influence_harm<<endl;
-	cout<<"rate: "<<influence_harm/Eh<<endl;
-	
-	
-	turns=1000;
-	double dbe=0.0;
-	
-	const int vie_num=19;
-	double vies[vie_num];	//viewpoints
-	for(int i=0;i<vie_num;i++){
-		vies[i]=-0.9+i*0.1;
-		
-	}
-	
-	vector<set<double> > L(n);
-	for(int v=0;v<n;v++){
-		L[v].insert(viewpoint[userID_Name[v]]);
-	}
-	
-	
-	
-	//map<double, vector<string> > spreader;
-		
-	while(turns--){
-		for(int i=0;i<vie_num;i++){
-			
-			vector<string> resultlist_r1=spreader[i+1];	
-			vector<int> checked_r1(n,0);	
-			
-			
-			vector<string>::iterator it=resultlist_r1.begin();
-			for(;it!=resultlist_r1.end();it++){
-				checked_r1[user2ID[*it]]=1;
-			}			
-			
-			while(resultlist_r1.size()!=0){
-				
-				string current_node=resultlist_r1.front();
-				resultlist_r1.erase(resultlist_r1.begin());
-				
-				int current_id=user2ID[current_node];
-				L[current_id].insert(vies[i]);
-	
-				//select out-neighbors of the current_node
-				for(auto it_list=adj_out[user2ID[current_node]].begin();it_list!=adj_out[user2ID[current_node]].end();it_list++){
-					
-					double edgepro=(*it_list).second;
-					
-					double nodepro=1.0;
-					string username_v=userID_Name[(*it_list).first];
-					
-					if(Bset[(*it_list).first]==1){
-						nodepro=1.0;
-					}
-					else{
-						nodepro=1.0-fabs(vies[i]-viewpoint[username_v])/2;			
-					}
-					
-					if(checked_r1[(*it_list).first]==0&&a_rand()<=edgepro*nodepro){
-						checked_r1[(*it_list).first]=1;
-						resultlist_r1.push_back(username_v);
-					}
-				}	
-			}			
-			
-			
-		}
-		
-	}
-	
-	//compute dbe
-	for(int v=0;v<n;v++){
-		dbe+=computeDiversityofExposure(L[v])/n;
-	}
-
-	cout<<dbe<<endl;	
-}
 
 void HGA(int budget, int num_spreader, double gamma, int round){
 	
 	HVB(budget,gamma,round); //obtain B_h
 	
 	DBEM2(budget-B_h.size(),budget,round); //obtain B_b
-	
-	/*
-	//OutDegree;
-	OD_HVB(budget-B_h.size(),budget,round);
-	
-	OD(budget,round);
-	 
-	//InDegree;
-	ID_HVB(budget-B_h.size(),budget,round);
-	
-	ID(budget,round);	
-	
-	//PageRank;
-	PR_HVB(budget-B_h.size(),budget,round);
-	
-	PR(budget,round);
-	*/
 	 
 }
 
@@ -2827,19 +1402,23 @@ void HGA(int budget, int num_spreader, double gamma, int round){
 int main(){
 
 
-	//const char *file="iphone_samsung\\iphone_samsung_network_heterogeneous.txt";
 	const char *file="brexit\\brexit_network_heterogeneous.txt";
 	//const char *file="uselections\\uselections_network_heterogeneous.txt";
+	
+	//const char *file="email-Eu-core.txt\\email-Eu-core.txt";
+	//const char *file="facebook_combined.txt\\facebook_combined.txt";
+	//const char *file="cit-HepTh.txt\\cit-HepTh.txt";
+	
 	std::string folder(file);
 	size_t pos = folder.find('\\');
 	std::string beforeSlash = folder.substr(0, pos);
 	
-	//if(beforeSlash=="Slashdot" or beforeSlash=="Epinions"){
-	//	readGraph2(file); 
-	//} 
-	//else readGraph(file);
+	if(beforeSlash=="email-Eu-core.txt" or beforeSlash=="facebook_combined.txt" or beforeSlash=="cit-HepTh.txt"){
+		readGraph2(file); 
+	} 
+	else readGraph(file);
 	
-	readGraph(file);
+	//readGraph(file);
 	
 	int round=0;
 	int NUM_TO_SELECT=20;
