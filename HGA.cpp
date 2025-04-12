@@ -42,7 +42,7 @@ using namespace std;
 
 int n, m; /* number of nodes, arcs */
 
-double epsilon=0.1;
+double epsilon=0.2;
 double infharm;
 vector<string> username;
 
@@ -334,6 +334,139 @@ void readGraph2(const char* file){
 	} 
 
 	
+
+	
+	//userID_Name;
+	for(map<string, int>::iterator it_map=user2ID.begin();it_map!=user2ID.end();it_map++){
+		userID_Name[it_map->second]=it_map->first;
+	}
+	
+	
+	fprintf(stderr, "END reading graph (%s).\n", file); 
+	
+	
+
+}
+
+//undirected graph
+void readGraph3(const char* file){
+	//readfile, obtain vertexs edges
+	int x,y;
+	int count_edges=0;
+	int count_vertices=0;
+	string user_a,user_b;
+	long double prob_edge;
+	long double prob_a,prob_b;
+	
+	
+	
+	map<string, int>::iterator it;
+	ifstream infile(file);
+	
+	while(infile>>user_a>>user_b) {
+		//for a
+		it=user2ID.find(user_a);
+		if(it!=user2ID.end()){
+			x=it->second;
+
+		}
+		else{
+			username.push_back(user_a);
+			user2ID[user_a]=count_vertices;
+			x=count_vertices++;
+
+		}
+		
+		//for b
+		it=user2ID.find(user_b);
+		if(it!=user2ID.end()){
+			y=it->second;
+			in_deg[user_b]+=1;
+
+		}
+		else{
+			username.push_back(user_b);
+			user2ID[user_b]=count_vertices;
+			y=count_vertices++;
+			in_deg[user_b]=1;
+
+		}		
+		
+		
+		
+		count_edges++;
+		InputEdges.push_back(x);
+		InputEdges.push_back(y);	
+	}
+	
+	ifstream infile_r(file);	
+	
+	while(infile_r>>user_a>>user_b) {
+
+		if(in_deg.find(user_a)==in_deg.end()) in_deg[user_a]=1;
+		else in_deg[user_a]+=1;
+		int x=user2ID[user_b];
+		int y=user2ID[user_a];
+		
+		count_edges++;
+		InputEdges.push_back(x);
+		InputEdges.push_back(y);	
+	}	
+	
+	n=count_vertices;
+	m=count_edges;
+	
+	cout<<"number of users:"<<n<<" number of edges:"<<m<<"\n";
+	
+	
+	//viewpoint
+	vector<string>::iterator it_vector;
+	
+	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();  
+    std::mt19937 gen(seed);  
+  
+    // 定义在-1到1范围内的均匀实数分布  
+    std::uniform_real_distribution<> dis(-1.0, 1.0);  
+  
+    // 生成随机数  
+    
+	
+	for(it_vector=username.begin();it_vector!=username.end();it_vector++)
+	{
+		double randomNumber = dis(gen);
+		viewpoint[*it_vector]=round(randomNumber * 10) / 10;
+	}
+
+	//EdgeProb
+	ifstream infile2(file);
+	while(infile2>>user_a>>user_b){
+		EdgeProb.push_back(1.0/in_deg[user_b]);
+	}
+	
+	ifstream infile3(file);
+	while(infile3>>user_a>>user_b){
+		EdgeProb.push_back(1.0/in_deg[user_a]);
+	}
+		
+	if(adj_out.size()<n) adj_out.resize(n);
+	
+	//构造出度邻接表 
+	for (int j=0; j<InputEdges.size(); j+=2){
+		//edge x -> y
+		x = InputEdges.at(j);	 
+		y = InputEdges.at(j+1);
+		int i=j/2;
+		adj_out[x].push_back(pair<int,double>(y,EdgeProb[i]));
+	}
+	adj_in.resize(n); 
+	//构建入度邻接表
+	for(int j=0;j<InputEdges.size();j+=2){
+		//edge x -> y
+		x=InputEdges.at(j);
+		y=InputEdges.at(j+1);
+		int i=j/2;
+		adj_in[y].push_back(pair<int,double>(x,EdgeProb[i])); 
+	} 
 
 	
 	//userID_Name;
@@ -916,8 +1049,7 @@ void HVB(int budget,double gamma,int round){
 		deleted[index]=1;
 		zeta_in_Bh+=maxzeta;
 		B_h.insert(index);
-		cout<<"B_hsize "<<B_h.size()<<" maxzeta "<<maxzeta<<endl;
-		//delete zeta;
+		
 	}
 	cout<<"rate："<<1.0-zeta_in_Bh/infharm<<endl;
 	auto end = std::chrono::high_resolution_clock::now();  
@@ -1009,6 +1141,7 @@ void DBEM2(int budget,int k,int round){
 						v.push(w);
 						upath[w][i][j]=1;
 						upath_upper[w][i][j]=1;
+						//upath_for_B_b[w][i][j]=1;	
 						v_visit[w]=1;					
 					}		
 						
@@ -1018,6 +1151,7 @@ void DBEM2(int budget,int k,int round){
 			}
 							
 			//BFS
+			//queue<int> s=spreader[j+1];
 			queue<int> s;
 			for(vector<string>::iterator it=Sb.begin();it!=Sb.end();it++){
 				if( fabs(viewpoint[*it] - vies[j])<=1e-6 ){
@@ -1253,7 +1387,6 @@ void DBEM2(int budget,int k,int round){
 	vector<int> visited_B_b(n,0); 
 	
 	double phi=phi_empty;	//result
-	
 		
 	while(B_b.size()<budget){
 		int index=-1;
@@ -1362,6 +1495,9 @@ void DBEM2(int budget,int k,int round){
 			budget=budget+1;
 		}
 	}
+
+	cout<<"beforebh:"<<phi/n<<endl; 
+	//double beforebh=phi/n;
 	//+B_h
 	
 	double phi_sep=phi; 
@@ -1380,13 +1516,15 @@ void DBEM2(int budget,int k,int round){
 		}
 		
 	}
-	cout<<"HGA："<<phi/n<<endl;
+	cout<<"Obj func："<<phi/n<<endl;
+	
 	
 	auto end = std::chrono::high_resolution_clock::now(); 
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);  
 	cout << "running time of DBEM: " << duration.count() << "ms" << std::endl;
 
 }
+
 
 
 
@@ -1402,10 +1540,9 @@ void HGA(int budget, int num_spreader, double gamma, int round){
 int main(){
 
 
-	const char *file="brexit\\brexit_network_heterogeneous.txt";
+	const char *file="iphone_samsung\\iphone_samsung_network_heterogeneous.txt";
+	//const char *file="brexit\\brexit_network_heterogeneous.txt";
 	//const char *file="uselections\\uselections_network_heterogeneous.txt";
-	
-	//const char *file="email-Eu-core.txt\\email-Eu-core.txt";
 	//const char *file="facebook_combined.txt\\facebook_combined.txt";
 	//const char *file="cit-HepTh.txt\\cit-HepTh.txt";
 	
@@ -1413,9 +1550,12 @@ int main(){
 	size_t pos = folder.find('\\');
 	std::string beforeSlash = folder.substr(0, pos);
 	
-	if(beforeSlash=="email-Eu-core.txt" or beforeSlash=="facebook_combined.txt" or beforeSlash=="cit-HepTh.txt"){
+	if(beforeSlash=="cit-HepTh.txt"){
 		readGraph2(file); 
 	} 
+	else if(beforeSlash=="facebook_combined.txt"){
+		readGraph3(file);
+	}
 	else readGraph(file);
 	
 	//readGraph(file);
