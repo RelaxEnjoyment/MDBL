@@ -933,7 +933,7 @@ void HVB(int budget,double gamma,int round){
 	double vies[2]={-1.0,1.0};
 	//compute E[H(\emptyset)]
 	infharm=EHemptyset();
-	int theta=10000;
+	int theta=8000;
 	if(fabs(infharm-0)<=1e-6 ){
 		return;
 	}
