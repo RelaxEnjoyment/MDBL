@@ -42,7 +42,7 @@ using namespace std;
 
 int n, m; /* number of nodes, arcs */
 
-double epsilon=0.2;
+double epsilon=0.1;
 double infharm;
 vector<string> username;
 
