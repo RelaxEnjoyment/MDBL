@@ -42,7 +42,7 @@ using namespace std;
 
 int n, m; /* number of nodes, arcs */
 
-double epsilon=0.1;
+double epsilon=0.2;
 double infharm;
 vector<string> username;
 
@@ -51,10 +51,13 @@ map<int ,string> userID_Name;
 vector<int> InputEdges;		//
 vector<double> EdgeProb;	//propagation probability
 map<string, vector<double> > NodeProb;	//persuasion probability
+vector<double> persua_n1;	//p_u^-1
+vector<double> persua_p1;	//p_u^1
 map<string, long double> pa;
 map<string, long double> pb;
 map<string, int> in_deg;			//in-degree
 map<string, double> viewpoint;	//viewpoint of user
+map<int, double> viewpoint_id;	//viewpoint of user
 
 //spreaders 
 vector<string> Sh;	
@@ -185,12 +188,14 @@ void readGraph(const char* file){
 		double randomNumber = dis(gen);
 		double x=round(randomNumber * 10) / 10;
 		viewpoint[*it_vector]=round(randomNumber * 10) / 10;
+		viewpoint_id[user2ID[*it_vector]]=viewpoint[*it_vector];
 		
 	}
 		
 	for(it_for_pa=pa.begin(),it_for_pb=pb.begin();it_for_pa!=pa.end();it_for_pa++,it_for_pb++){	
 		viewpoint[it_for_pa->first]=(it_for_pa->second*2)/(it_for_pa->second+it_for_pb->second)-1;
 		viewpoint[it_for_pa->first]=round(viewpoint[it_for_pa->first] * 10) / 10;
+		viewpoint_id[user2ID[it_for_pa->first]]=viewpoint[it_for_pa->first];
 	}
 	
 	//EdgeProb
@@ -198,6 +203,28 @@ void readGraph(const char* file){
 	while(infile2>>user_a>>user_b>>prob_a>>prob_b){
 		EdgeProb.push_back(1.0/in_deg[user_b]);
 	}
+
+	//NodeProb
+	vector<string>::iterator itForNodeProb;
+	for(itForNodeProb=username.begin();itForNodeProb!=username.end();itForNodeProb++){
+		for(int l=0;l<21;l++){
+			double puo=0.0;
+			if(viewpoint[*itForNodeProb]>=-1.0+l*0.1) puo=1-(viewpoint[*itForNodeProb]+1.0-l*0.1)/2.0;
+			else puo=1-(-1.0+l*0.1-viewpoint[*itForNodeProb])/2.0;
+			
+			NodeProb[*itForNodeProb].push_back(puo);
+		}
+		
+		//cout<<userReputation[*itForRepu]<<" ";
+	}
+	
+	for(auto elem:username){
+		double nodepro_n1=1.0-fabs(-1.0-viewpoint[elem])/2;
+		persua_n1.push_back(nodepro_n1);
+		double nodepro_p1=1.0-fabs(1.0-viewpoint[elem])/2;
+		persua_p1.push_back(nodepro_p1);
+		
+	}		
 	
 	if(adj_out.size()<n) adj_out.resize(n);
 	
@@ -305,6 +332,7 @@ void readGraph2(const char* file){
 	{
 		double randomNumber = dis(gen);
 		viewpoint[*it_vector]=round(randomNumber * 10) / 10;
+		viewpoint_id[user2ID[*it_vector]]=viewpoint[*it_vector];
 	}
 
 	//EdgeProb
@@ -312,6 +340,30 @@ void readGraph2(const char* file){
 	while(infile2>>user_a>>user_b){
 		EdgeProb.push_back(1.0/in_deg[user_b]);
 	}
+	
+	
+	//NodeProb
+	vector<string>::iterator itForNodeProb;
+	for(itForNodeProb=username.begin();itForNodeProb!=username.end();itForNodeProb++){
+		for(int l=0;l<21;l++){
+			double puo=0.0;
+			if(viewpoint[*itForNodeProb]>=-1.0+l*0.1) puo=1-(viewpoint[*itForNodeProb]+1.0-l*0.1)/2.0;
+			else puo=1-(-1.0+l*0.1-viewpoint[*itForNodeProb])/2.0;
+			
+			NodeProb[*itForNodeProb].push_back(puo);
+		}
+		
+		//cout<<userReputation[*itForRepu]<<" ";
+	}	
+	
+
+	for(auto elem:username){
+		double nodepro_n1=1.0-fabs(-1.0-viewpoint[elem])/2;
+		persua_n1.push_back(nodepro_n1);
+		double nodepro_p1=1.0-fabs(1.0-viewpoint[elem])/2;
+		persua_p1.push_back(nodepro_p1);
+		
+	}	
 	
 	if(adj_out.size()<n) adj_out.resize(n);
 	//outdegree adjacency table	 
@@ -348,7 +400,6 @@ void readGraph2(const char* file){
 
 }
 
-//undirected graph
 void readGraph3(const char* file){
 	//readfile, obtain vertexs edges
 	int x,y;
@@ -435,6 +486,7 @@ void readGraph3(const char* file){
 	{
 		double randomNumber = dis(gen);
 		viewpoint[*it_vector]=round(randomNumber * 10) / 10;
+		viewpoint_id[user2ID[*it_vector]]=viewpoint[*it_vector];
 	}
 
 	//EdgeProb
@@ -447,6 +499,14 @@ void readGraph3(const char* file){
 	while(infile3>>user_a>>user_b){
 		EdgeProb.push_back(1.0/in_deg[user_a]);
 	}
+	
+	for(auto elem:username){
+		double nodepro_n1=1.0-fabs(-1.0-viewpoint[elem])/2;
+		persua_n1.push_back(nodepro_n1);
+		double nodepro_p1=1.0-fabs(1.0-viewpoint[elem])/2;
+		persua_p1.push_back(nodepro_p1);
+		
+	}		
 		
 	if(adj_out.size()<n) adj_out.resize(n);
 	
@@ -665,6 +725,7 @@ double EHemptyset(){
 	return 1.0*influence/10000;
 }
 
+/*
 map<int, list<int> > generate_live_edge_g(vector<list<pair<int,double> > > & G_d ,  vector<int> & deleted){
 	map<int, list<int> > g;
 	for(size_t i=0;i<G_d.size();i++){
@@ -680,30 +741,11 @@ map<int, list<int> > generate_live_edge_g(vector<list<pair<int,double> > > & G_d
 	return g;
 	
 }
+*/
 
-map<int, list<int> > generate_viewpoint_sampling_graph(map<int, list<int> > & g, double & vie, vector<int> & deleted){
-	map<int, list<int> > gj=g;
-	int in_del[n]={0};
-	//map<string, double> viewpoint;
-	
-	for(map<string, double>::iterator it=viewpoint.begin();it!=viewpoint.end();it++){
-		double nodepro=1.0-fabs(vie-it->second)/2;
-		if(a_rand()>nodepro) in_del[user2ID[it->first]]=1;
-	}
 
+void Point_to_merge(map<int,list<pair<int,double> > >& adj_out_map,double & vie, vector<int> & deleted){
 	
-	//Traverse the adjacency table and remove the entry edges of these nodes
-	map<int, list<int> >::iterator it;
-	for (it=gj.begin(); it != gj.end(); ++it) {    
-        for (list<int>::iterator adj=(it->second).begin(); adj!=(it->second).end();) {  
-            list<int>::iterator temp=adj++;
-			if(in_del[*temp]==1) (it->second).erase(temp);
-        }    
-    }
-    
-
-	
-	//map<int, list<int> > gjj;
 	int s=-1;	//new point of spreaders of -1
 	vector<int> point_to_merge;
 	for(vector<string>::iterator itt=Sh.begin();itt!=Sh.end();itt++){
@@ -711,36 +753,57 @@ map<int, list<int> > generate_viewpoint_sampling_graph(map<int, list<int> > & g,
 			point_to_merge.push_back(user2ID[*itt]);
 		}
 	}
-	
-	// duplicate removal
-    std::unordered_set<int> unique_edges;
+
+
+	map<int, vector<double> > onenode; 
     
-	// Traverse each node to be merged, add its edge to the edge list of the new node, and remove duplicates
+	// Traverse each node to be merged, add its edge to the edge list of the new node
     for (int point : point_to_merge) {  
-        if (gj.find(point) != gj.end()) {  
-            for (int edge : gj[point]) {  
-                // Only add edges when they are not in the emerging edge list of the new node, and ensure that edges inside the merged node are also not added
-                if (find(point_to_merge.begin(),point_to_merge.end(),edge)==point_to_merge.end() && unique_edges.find(edge) == unique_edges.end()) { 
-				 
-                    gj[s].push_back(edge);  
-                    unique_edges.insert(edge);  
+        if (adj_out_map.find(point) != adj_out_map.end()) {  
+            for (auto edge : adj_out_map[point]) {  
+                // ensure that edges among the merged nodes are not added
+				if (find(point_to_merge.begin(),point_to_merge.end(),edge.first)==point_to_merge.end() ) {  
+                    //adj_out_map[s].push_back(edge);  
+                    //unique_edges.insert(edge);
+					onenode[edge.first].push_back(edge.second);  
                 }  
             }  
         }  
-    }  
-    
+    }
+	
+	map<int, vector<double> >::iterator it;
+	
+	for(it=onenode.begin();it!=onenode.end();it++){
+		double multip=1.0;
+		for(auto elem:it->second){
+			multip*=(1-elem);
+		}
+		double new_edge_prob=1-multip;
+		adj_out_map[s].push_back(pair<int,double>(it->first,new_edge_prob));
+	}
 	
 	 // Remove these nodes to be merged from the map 
     for (int point : point_to_merge) {  
-        gj.erase(point);  
-    }  
-
-
-	return gj;
+        adj_out_map.erase(point);  
+    }  	  	
+	
 }
 
 
-void BFS_for_nodes(map<int,list<int> >& gj, set<int>& xi_sg_current, vector<int>& nodes_source, vector<pair<int,int> >& edges_source,int start_id){
+void BFS_for_nodes(double& vie,map<int,list<pair<int,double> > >& adj_out_map, set<int>& xi_sg_current, vector<int>& nodes_source, vector<pair<int,int> >& edges_source,int start_id){
+	int in_del[n]={0};
+	
+	if(fabs(vie-1)<=1e-6){
+		for(int i=0;i<persua_p1.size();i++){
+			if(a_rand()>persua_p1[i]) in_del[i]=1;
+		}		
+	}
+	else{
+		for(int i=0;i<persua_n1.size();i++){
+			if(a_rand()>persua_n1[i]) in_del[i]=1;
+		}		
+	}	
+	
 	queue<int> q;
 	q.push(start_id);
 	xi_sg_current.insert(start_id);
@@ -749,12 +812,13 @@ void BFS_for_nodes(map<int,list<int> >& gj, set<int>& xi_sg_current, vector<int>
 		int current=q.front();
 		q.pop();
 		
-		for(list<int>::iterator it=gj[current].begin();it!=gj[current].end();it++){
-			if(xi_sg_current.find(*it)==xi_sg_current.end()){
-				q.push(*it);
-				xi_sg_current.insert(*it);
-				nodes_source.push_back(*it);
-				edges_source.push_back({current, *it});
+		for(list<pair<int,double> >::iterator it=adj_out_map[current].begin();it!=adj_out_map[current].end();it++){
+			if(a_rand()>it->second || in_del[it->first]==1) continue;
+			if(xi_sg_current.find(it->first)==xi_sg_current.end()){
+				q.push(it->first);
+				xi_sg_current.insert(it->first);
+				nodes_source.push_back(it->first);
+				edges_source.push_back({current, it->first});
 				
 			}
 		}
@@ -762,7 +826,6 @@ void BFS_for_nodes(map<int,list<int> >& gj, set<int>& xi_sg_current, vector<int>
 	}
 	
 }
-
 
 
 void dfs(int x) {  
@@ -927,13 +990,11 @@ void DTree(int num_node,int num_edge,vector<pair<int,int> >& edges_source_mappin
 //obtain B_h
 void HVB(int budget,double gamma,int round){
 	
-	
-	
 	int J=2;
 	double vies[2]={-1.0,1.0};
 	//compute E[H(\emptyset)]
 	infharm=EHemptyset();
-	int theta=8000;
+	int theta=10000;
 	if(fabs(infharm-0)<=1e-6 ){
 		return;
 	}
@@ -942,34 +1003,67 @@ void HVB(int budget,double gamma,int round){
 	double zeta_in_Bh=0.0;		//sum_result
 	vector<int> deleted(n,0);			//flag_delete_in_Bh
 	
-	vector<list<pair<int,double> > > G_d=adj_out; 
+	
 	auto start = std::chrono::high_resolution_clock::now();  	
 	while(zeta_in_Bh< (1.0+epsilon)*(1-gamma)*infharm){
 
-		//double* zeta=new double[n];
-		//for(int i=0;i<n;i++) zeta[i]=0.0;
+		//graph  for  vie  1
+		map<int, list<pair<int,double>> > adj_out_map;
+		for (int i = 0; i < adj_out.size(); ++i) {  
+				if(deleted[i]) continue;
+ 			    for(auto& pair: adj_out[i]){
+					int pair_first=pair.first;
+					if(deleted[pair_first]==0){	
+						adj_out_map[i].push_back(pair);
+					}	
+				}
+			
+				   
+		}
+		
+		//graph for vie  -1
+		map<int, list<pair<int,double>> > adj_out_map_n1;
+		for (int i = 0; i < adj_out.size(); ++i) {  
+				if(deleted[i]) continue;
+ 			    for(auto& pair: adj_out[i]){
+					int pair_first=pair.first;
+					if(deleted[pair_first]==0){	
+						adj_out_map_n1[i].push_back(pair);
+					}	
+				}
+				   
+		}		
+
 
 		vector<double> zeta(n,0.0);
 
 		for(int i=1;i<=theta;i++){
+			 
+
+			vector<set<int> >xi_sg(2); 
 		
-			map<int, list<int> > g = generate_live_edge_g(G_d,deleted);
+			vector<int> xi_u_sg[2][n];
 		
-			set<int> xi_sg[2];
-			std::vector<std::vector<std::vector<int>>> xi_u_sg(2, std::vector<std::vector<int>>(n));
 			
 			for(int j=0;j<J;j++){
-
-				map<int, list<int> > gj = generate_viewpoint_sampling_graph(g,vies[j],deleted);
+				
+				//S -> s  
+				if(j==0){ //viewpoint=-1
+					Point_to_merge(adj_out_map_n1,vies[j],deleted);
+				}
+				else Point_to_merge(adj_out_map,vies[j],deleted);  
 
 				//\xi(s,g^{o_j})
 				vector<int> nodes_source;
 				vector<pair<int,int> > edges_source;
 				int start_id=-1;
-				BFS_for_nodes(gj, xi_sg[j], nodes_source, edges_source,start_id);
 				
+				if(j==0){
+					BFS_for_nodes(vies[j],adj_out_map_n1,xi_sg[j], nodes_source, edges_source,start_id);
+				}
+				else BFS_for_nodes(vies[j],adj_out_map,xi_sg[j], nodes_source, edges_source,start_id);
+									
 				//DTree
-				//vector<int> nodes_source_mapping;
 				vector<pair<int,int> > edges_source_mapping;
 				map<int,int> true_vir;
 				map<int,int> vir_true;
@@ -985,6 +1079,8 @@ void HVB(int budget,double gamma,int round){
 				
 				DTree(nodes_source.size(), edges_source_mapping.size() , edges_source_mapping);
 
+				
+
 				for (int l = 1; l <= nodes_source.size(); l++) {  
 				    if(vir_true[l]==-1) continue;
 					vector<int>::iterator it;
@@ -998,10 +1094,10 @@ void HVB(int budget,double gamma,int round){
 				for(int l=0;l<=nodes_source.size();l++){
 					subtree[l].clear();
 				}
-				
-					
+							
 			}
 			
+		
 			set<int> xi_sg_union;	//contain -1 
 			
 			set_union(
@@ -1033,7 +1129,8 @@ void HVB(int budget,double gamma,int round){
 				int xi_sg_u_number=xi_u_sg_union.size()-1;
 				
 				zeta[l]=zeta[l]+(xi_sg_number*1.0-xi_sg_u_number*1.0)/(theta*1.0);
-			}
+			}				
+								
 		}
 		
 		//optimal zeta
@@ -1049,7 +1146,7 @@ void HVB(int budget,double gamma,int round){
 		deleted[index]=1;
 		zeta_in_Bh+=maxzeta;
 		B_h.insert(index);
-		
+		cout<<"B_hsize "<<B_h.size()<<endl;
 	}
 	cout<<"rate："<<1.0-zeta_in_Bh/infharm<<endl;
 	auto end = std::chrono::high_resolution_clock::now();  
@@ -1082,7 +1179,7 @@ void DBEM2(int budget,int k,int round){
 	int litk=budget;		//remaining budget 
 	set<int> CP;	
 	set<int> CP_upper;
-	const int theta=5000;
+	const int theta=10000;
 	int target_node[theta];	//target_node
 	for(int i=0;i<theta;i++) target_node[i]=-1;	
 	const int vie_num=19;
@@ -1141,7 +1238,6 @@ void DBEM2(int budget,int k,int round){
 						v.push(w);
 						upath[w][i][j]=1;
 						upath_upper[w][i][j]=1;
-						//upath_for_B_b[w][i][j]=1;	
 						v_visit[w]=1;					
 					}		
 						
@@ -1151,7 +1247,6 @@ void DBEM2(int budget,int k,int round){
 			}
 							
 			//BFS
-			//queue<int> s=spreader[j+1];
 			queue<int> s;
 			for(vector<string>::iterator it=Sb.begin();it!=Sb.end();it++){
 				if( fabs(viewpoint[*it] - vies[j])<=1e-6 ){
